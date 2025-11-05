@@ -8,15 +8,21 @@
 #import <React/RCTBridgeModule.h>
 #endif
 
+#if __has_include("RCTEventEmitter.h")
+#import "RCTEventEmitter.h"
+#else
+#import <React/RCTEventEmitter.h>
+#endif
+
 #import "GatewayManager.h"
 
-@interface ReactNativePayments : NSObject <RCTBridgeModule, PKPaymentAuthorizationViewControllerDelegate>
+@interface ReactNativePayments : RCTEventEmitter <RCTBridgeModule, PKPaymentAuthorizationViewControllerDelegate>
 
 @property (nonatomic, strong) RCTResponseSenderBlock callback;
 @property (nonatomic, strong) PKPaymentRequest *paymentRequest;
 @property (nonatomic, strong) NSDictionary *initialOptions;
 @property (nonatomic, strong) GatewayManager *gatewayManager;
-@property BOOL *hasGatewayParameters;
+@property BOOL hasGatewayParameters;
 @property (nonatomic, strong) PKPaymentAuthorizationViewController *viewController;
 @property (nonatomic, copy) void (^completion)(PKPaymentAuthorizationStatus);
 @property (nonatomic, copy) void (^shippingContactCompletion)(PKPaymentAuthorizationStatus, NSArray<PKShippingMethod *> * _Nonnull, NSArray<PKPaymentSummaryItem *> * _Nonnull);

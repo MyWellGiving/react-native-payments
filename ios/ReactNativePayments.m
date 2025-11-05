@@ -1,9 +1,7 @@
 #import "ReactNativePayments.h"
 #import <React/RCTUtils.h>
-#import <React/RCTEventDispatcher.h>
 
 @implementation ReactNativePayments
-@synthesize bridge = _bridge;
 
 RCT_EXPORT_MODULE()
 
@@ -15,6 +13,17 @@ RCT_EXPORT_MODULE()
 + (BOOL)requiresMainQueueSetup
 {
     return YES;
+}
+
+- (NSArray<NSString *> *)supportedEvents
+{
+    return @[
+        @"NativePayments:onuserdismiss",
+        @"NativePayments:onshippingaddresschange",
+        @"NativePayments:onshippingoptionchange",
+        @"NativePayments:onuseraccept",
+        @"NativePayments:ongatewayerror"
+    ];
 }
 
 - (NSDictionary *)constantsToExport
@@ -99,7 +108,7 @@ RCT_EXPORT_METHOD(complete: (NSString *)paymentStatus
 -(void) paymentAuthorizationViewControllerDidFinish:(PKPaymentAuthorizationViewController *)controller
 {
     [controller dismissViewControllerAnimated:YES completion:nil];
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"NativePayments:onuserdismiss" body:nil];
+    [self sendEventWithName:@"NativePayments:onuserdismiss" body:nil];
 }
 
 RCT_EXPORT_METHOD(handleDetailsUpdate: (NSDictionary *)details
@@ -186,20 +195,20 @@ RCT_EXPORT_METHOD(handleDetailsUpdate: (NSDictionary *)details
     
     CNPostalAddress *postalAddress = contact.postalAddress;
     // street, subAdministrativeArea, and subLocality are supressed for privacy
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"NativePayments:onshippingaddresschange"
-                                                    body:@{
-                                                           @"recipient": [NSNull null],
-                                                           @"organization": [NSNull null],
-                                                           @"addressLine": [NSNull null],
-                                                           @"city": postalAddress.city,
-                                                           @"region": postalAddress.state,
-                                                           @"country": [postalAddress.ISOCountryCode uppercaseString],
-                                                           @"postalCode": postalAddress.postalCode,
-                                                           @"phone": [NSNull null],
-                                                           @"languageCode": [NSNull null],
-                                                           @"sortingCode": [NSNull null],
-                                                           @"dependentLocality": [NSNull null]
-                                                           }];
+    [self sendEventWithName:@"NativePayments:onshippingaddresschange"
+                       body:@{
+                              @"recipient": [NSNull null],
+                              @"organization": [NSNull null],
+                              @"addressLine": [NSNull null],
+                              @"city": postalAddress.city,
+                              @"region": postalAddress.state,
+                              @"country": [postalAddress.ISOCountryCode uppercaseString],
+                              @"postalCode": postalAddress.postalCode,
+                              @"phone": [NSNull null],
+                              @"languageCode": [NSNull null],
+                              @"sortingCode": [NSNull null],
+                              @"dependentLocality": [NSNull null]
+                              }];
 }
 
 // Shipping Method delegates
@@ -209,9 +218,9 @@ RCT_EXPORT_METHOD(handleDetailsUpdate: (NSDictionary *)details
 {
     self.shippingMethodCompletion = completion;
     
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"NativePayments:onshippingoptionchange" body:@{
-                                                                                                         @"selectedShippingOptionId": shippingMethod.identifier
-                                                                                                         }];
+    [self sendEventWithName:@"NativePayments:onshippingoptionchange" body:@{
+                                                                           @"selectedShippingOptionId": shippingMethod.identifier
+                                                                           }];
     
 }
 
@@ -486,18 +495,16 @@ RCT_EXPORT_METHOD(handleDetailsUpdate: (NSDictionary *)details
         paymentResponse[@"shippingContact"] = [self contactToString:payment.shippingContact];
     }
     
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"NativePayments:onuseraccept"
-                                                    body:paymentResponse
-     ];
+    [self sendEventWithName:@"NativePayments:onuseraccept"
+                        body:paymentResponse];
 }
 
 - (void)handleGatewayError:(NSError *_Nonnull)error
 {
-    [self.bridge.eventDispatcher sendDeviceEventWithName:@"NativePayments:ongatewayerror"
-                                                    body: @{
-                                                            @"error": [error localizedDescription]
-                                                            }
-     ];
+    [self sendEventWithName:@"NativePayments:ongatewayerror"
+                        body:@{
+                               @"error": [error localizedDescription]
+                               }];
 }
 
 @end
