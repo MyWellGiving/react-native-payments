@@ -387,16 +387,40 @@ export default class PaymentRequest {
       this._shippingAddress = shippingAddress;
     }
 
+    const platformDetails = this._getPlatformDetails(details);
+
+    // On iOS the authorized PKPayment carries the full shipping contact
+    // (name, email, phone). `_shippingAddress` is only populated by
+    // `didSelectShippingContact`, which PassKit does not guarantee when only
+    // contact fields (no postal address) are required, and its `recipient`
+    // is always null from native. Read the contact off the payment instead,
+    // and never dereference a null `_shippingAddress`.
+    const iosContact = IS_IOS ? platformDetails.shippingContact : null;
+    const iosName = iosContact && iosContact.name
+      ? [iosContact.name.givenName, iosContact.name.familyName]
+          .filter(Boolean)
+          .join(' ')
+      : '';
+    const shippingAddress = this._shippingAddress || {};
+
     const paymentResponse = new PaymentResponse({
       requestId: this.id,
       methodName: IS_IOS ? 'apple-pay' : 'android-pay',
       shippingAddress: this._options.requestShipping ? this._shippingAddress : null,
-      details: this._getPlatformDetails(details),
+      details: platformDetails,
       shippingOption: IS_IOS ? this._shippingOption : null,
-      payerName: this._options.requestPayerName ? this._shippingAddress.recipient : null,
-      payerPhone: this._options.requestPayerPhone ? this._shippingAddress.phone : null,
-      payerEmail: IS_ANDROID && this._options.requestPayerEmail
-        ? details.payerEmail
+      payerName: this._options.requestPayerName
+        ? (IS_IOS ? iosName || null : shippingAddress.recipient || null)
+        : null,
+      payerPhone: this._options.requestPayerPhone
+        ? (IS_IOS
+            ? (iosContact && iosContact.phoneNumber) || null
+            : shippingAddress.phone || null)
+        : null,
+      payerEmail: this._options.requestPayerEmail
+        ? (IS_IOS
+            ? (iosContact && iosContact.emailAddress) || null
+            : details.payerEmail || null)
         : null
     });
 
