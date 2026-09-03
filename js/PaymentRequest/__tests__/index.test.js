@@ -177,5 +177,68 @@ describe('PaymentRequest', () => {
         expect(result).toBe(true);
       });
     });
+
+    describe('_handleUserAccept (iOS)', () => {
+      const shippingContact = {
+        name: { givenName: 'Jane', familyName: 'Appleseed' },
+        emailAddress: 'jane@example.com',
+        phoneNumber: '5551234567',
+        postalAddress: {}
+      };
+      const acceptDetails = {
+        transactionIdentifier: 'abc',
+        paymentData: JSON.stringify({ data: 'x' }),
+        billingContact: '',
+        shippingContact: JSON.stringify(shippingContact),
+        paymentMethod: { displayName: 'Visa 1234' }
+      };
+
+      it('reads payer name and email from the authorized shipping contact without a shipping address event', async () => {
+        const request = createInteractivePaymentRequest(METHOD_DATA, DETAILS, {
+          requestPayerName: true,
+          requestPayerEmail: true
+        });
+        const accepted = new Promise(resolve => {
+          request._acceptPromiseResolver = resolve;
+        });
+
+        expect(request._shippingAddress).toBe(null);
+        request._handleUserAccept(acceptDetails);
+        const response = await accepted;
+
+        expect(response.payerName).toBe('Jane Appleseed');
+        expect(response.payerEmail).toBe('jane@example.com');
+        expect(response.payerPhone).toBe(null);
+        expect(response.details.shippingContact).toEqual(shippingContact);
+      });
+
+      it('returns null payer fields when they were not requested', async () => {
+        const request = createInteractivePaymentRequest(METHOD_DATA, DETAILS);
+        const accepted = new Promise(resolve => {
+          request._acceptPromiseResolver = resolve;
+        });
+
+        request._handleUserAccept(acceptDetails);
+        const response = await accepted;
+
+        expect(response.payerName).toBe(null);
+        expect(response.payerEmail).toBe(null);
+      });
+
+      it('does not throw when name is requested and the sheet returned no contact', async () => {
+        const request = createInteractivePaymentRequest(METHOD_DATA, DETAILS, {
+          requestPayerName: true
+        });
+        const accepted = new Promise(resolve => {
+          request._acceptPromiseResolver = resolve;
+        });
+
+        expect(() =>
+          request._handleUserAccept({ ...acceptDetails, shippingContact: '' })
+        ).not.toThrow();
+        const response = await accepted;
+        expect(response.payerName).toBe(null);
+      });
+    });
   });
 });
