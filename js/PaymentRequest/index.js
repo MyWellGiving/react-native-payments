@@ -18,8 +18,8 @@ import type {
 import type PaymentResponseType from './PaymentResponse';
 
 // Modules
-import { DeviceEventEmitter, Platform } from 'react-native';
-import uuid from 'uuid/v1';
+import { DeviceEventEmitter, NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import { v1 as uuid } from 'uuid';
 
 import NativePayments from '../NativeBridge';
 import PaymentResponse from './PaymentResponse';
@@ -59,6 +59,15 @@ import {
 const noop = () => {};
 const IS_ANDROID = Platform.OS === 'android';
 const IS_IOS = Platform.OS === 'ios'
+
+// RCTEventEmitter events only reach JS via NativeEventEmitter on modern RN.
+// DeviceEventEmitter.addListener does not increment the native listener count,
+// so PKPaymentAuthorizationViewController stays on Processing until Apple
+// times out with "Payment Not Completed".
+const paymentsEmitter =
+  IS_IOS && NativeModules.ReactNativePayments
+    ? new NativeEventEmitter(NativeModules.ReactNativePayments)
+    : DeviceEventEmitter;
 
 // function processPaymentDetailsModifiers(details, serializedModifierData) {
 //     let modifiers = [];
@@ -232,29 +241,29 @@ export default class PaymentRequest {
 
   _setupEventListeners() {
     // Internal Events
-    this._userDismissSubscription = DeviceEventEmitter.addListener(
+    this._userDismissSubscription = paymentsEmitter.addListener(
       USER_DISMISS_EVENT,
       this._closePaymentRequest.bind(this)
     );
-    this._userAcceptSubscription = DeviceEventEmitter.addListener(
+    this._userAcceptSubscription = paymentsEmitter.addListener(
       USER_ACCEPT_EVENT,
       this._handleUserAccept.bind(this)
     );
 
     if (IS_IOS) {
-      this._gatewayErrorSubscription = DeviceEventEmitter.addListener(
+      this._gatewayErrorSubscription = paymentsEmitter.addListener(
         GATEWAY_ERROR_EVENT,
         this._handleGatewayError.bind(this)
       );
 
       // https://www.w3.org/TR/payment-request/#onshippingoptionchange-attribute
-      this._shippingOptionChangeSubscription = DeviceEventEmitter.addListener(
+      this._shippingOptionChangeSubscription = paymentsEmitter.addListener(
         INTERNAL_SHIPPING_OPTION_CHANGE_EVENT,
         this._handleShippingOptionChange.bind(this)
       );
 
       // https://www.w3.org/TR/payment-request/#onshippingaddresschange-attribute
-      this._shippingAddressChangeSubscription = DeviceEventEmitter.addListener(
+      this._shippingAddressChangeSubscription = paymentsEmitter.addListener(
         INTERNAL_SHIPPING_ADDRESS_CHANGE_EVENT,
         this._handleShippingAddressChange.bind(this)
       );
@@ -415,6 +424,9 @@ export default class PaymentRequest {
     if (IS_IOS) {
       this._shippingAddressChangeSubscription.remove()
       this._shippingOptionChangeSubscription.remove()
+      if (this._gatewayErrorSubscription) {
+        this._gatewayErrorSubscription.remove()
+      }
     }
   }
 
